@@ -1,16 +1,13 @@
 package com.github.jtail.enumerator;
 
+import com.github.jtail.enumerator.types.AnimalType;
 import com.github.jtail.enumerator.types.Bird;
 import com.github.jtail.enumerator.types.Mammal;
-import com.github.jtail.enumerator.types.AnimalType;
 import org.junit.Assert;
 import org.junit.Test;
 
 import java.util.Comparator;
 
-/**
- *
- */
 public class EnumeratorTest {
     @Test
     public void name() throws Exception {
