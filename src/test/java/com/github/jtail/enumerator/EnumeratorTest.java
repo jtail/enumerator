@@ -1,9 +1,12 @@
 package com.github.jtail.enumerator;
 
-import com.github.jtail.enumerator.test.Bird;
-import com.github.jtail.enumerator.test.Mammal;
+import com.github.jtail.enumerator.types.Bird;
+import com.github.jtail.enumerator.types.Mammal;
+import com.github.jtail.enumerator.types.AnimalType;
 import org.junit.Assert;
 import org.junit.Test;
+
+import java.util.Comparator;
 
 /**
  *
@@ -11,7 +14,10 @@ import org.junit.Test;
 public class EnumeratorTest {
     @Test
     public void name() throws Exception {
-        Class<?>[] classes = Enumerator.getClasses(Mammal.class.getPackage().getName());
-        Assert.assertArrayEquals(new Class<?>[]{Mammal.class, Bird.class}, classes);
+        Class<?>[] classes = Enumerator.getClasses(AnimalType.class).sorted(
+                Comparator.comparing(Class::getName)
+        ).toArray(Class<?>[]::new);
+
+        Assert.assertArrayEquals(new Class<?>[]{AnimalType.class, Bird.class, Mammal.class}, classes);
     }
 }
