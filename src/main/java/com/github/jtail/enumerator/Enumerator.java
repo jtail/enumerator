@@ -4,21 +4,44 @@ import lombok.SneakyThrows;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.annotation.Annotation;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
+
+import static java.util.AbstractMap.SimpleEntry;
 
 /**
  *
  */
 public class Enumerator {
 
-    public static Map<String, Class<?>> scan(Class<?> packageMarker) {
-        throw new UnsupportedOperationException();
+    public static Map<String, Class<?>> scan(Class<? extends Annotation> annotation) {
+        return scan(annotation, annotation);
+    }
+
+    public static Map<String, Class<?>> scan(Class<? extends Annotation> annotation, Class<?> packageMarker) {
+        return getClasses(packageMarker).flatMap(
+                c -> getFieldsFinalStaticString(c).filter(
+                        field -> field.getAnnotation(annotation) != null
+                ).map(
+                        field -> toEntry(c, field)
+                )
+        ).collect(
+                Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)
+        );
+    }
+
+    @SneakyThrows(IllegalAccessException.class)
+    private static SimpleEntry<String, ? extends Class<?>> toEntry(Class<?> c, Field field)  {
+        return new SimpleEntry<>((String) field.get(null), c);
     }
 
     /**
@@ -26,7 +49,7 @@ public class Enumerator {
      *
      * @param packageMarker
      */
-    public static Stream<Class<?>> getClasses(Class<?> packageMarker) {
+    static Stream<Class<?>> getClasses(Class<?> packageMarker) {
         ClassLoader classLoader = packageMarker.getClassLoader();
         String packageName = packageMarker.getPackage().getName();
         return getClasses(packageName, classLoader);
@@ -67,6 +90,17 @@ public class Enumerator {
                     }
                 })
         ).orElse(Stream.empty());
+    }
+
+    private static <T> Stream<Field> getFieldsFinalStaticString(Class<T> clazz) {
+        return Stream.of(clazz.getFields()).filter(
+                Enumerator::isStaticFinal
+        ).filter(f -> String.class.isAssignableFrom(f.getType()));
+    }
+
+    private static boolean isStaticFinal(Field f) {
+        int modifiers = f.getModifiers();
+        return Modifier.isStatic(modifiers) && Modifier.isFinal(modifiers);
     }
 
 }
