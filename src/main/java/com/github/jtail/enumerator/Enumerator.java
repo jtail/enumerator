@@ -13,6 +13,7 @@ import java.util.Enumeration;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -23,11 +24,11 @@ import static java.util.AbstractMap.SimpleEntry;
  */
 public class Enumerator {
 
-    public static Map<String, Class<?>> scan(Class<? extends Annotation> annotation) {
-        return scan(annotation, annotation);
+    public static Map<String, Class<?>> indexBeans(Class<? extends Annotation> annotation) {
+        return indexBeans(annotation, annotation);
     }
 
-    public static Map<String, Class<?>> scan(Class<? extends Annotation> annotation, Class<?> packageMarker) {
+    public static Map<String, Class<?>> indexBeans(Class<? extends Annotation> annotation, Class<?> packageMarker) {
         return getClasses(packageMarker).flatMap(
                 c -> getFieldsFinalStaticString(c).filter(
                         field -> field.getAnnotation(annotation) != null
@@ -39,9 +40,18 @@ public class Enumerator {
         );
     }
 
-    @SneakyThrows(IllegalAccessException.class)
-    private static SimpleEntry<String, ? extends Class<?>> toEntry(Class<?> c, Field field)  {
-        return new SimpleEntry<>((String) field.get(null), c);
+    public static <T extends Annotation, C> Map<String, Class<? extends C>> indexConsumers(Class<T> annotation, Function<T, String> fn) {
+        return indexConsumers(annotation, fn, annotation);
+    }
+
+    public static <T extends Annotation, C> Map<String, Class<? extends C>> indexConsumers(Class<T> annotation, Function<T, String> fn, Class<?> packageMarker) {
+        return getClasses(packageMarker).filter(
+                c -> c.getAnnotation(annotation) != null
+        ).map(
+                c -> (Class<C>) c
+        ).collect(
+                Collectors.toMap(c -> fn.apply(c.getAnnotation(annotation)), Function.identity())
+        );
     }
 
     /**
@@ -101,6 +111,11 @@ public class Enumerator {
     private static boolean isStaticFinal(Field f) {
         int modifiers = f.getModifiers();
         return Modifier.isStatic(modifiers) && Modifier.isFinal(modifiers);
+    }
+
+    @SneakyThrows(IllegalAccessException.class)
+    private static SimpleEntry<String, ? extends Class<?>> toEntry(Class<?> c, Field field) {
+        return new SimpleEntry<>((String) field.get(null), c);
     }
 
 }
