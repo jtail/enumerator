@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -40,17 +41,21 @@ public class Enumerator {
         );
     }
 
-    public static <T extends Annotation, C> Map<String, Class<? extends C>> indexConsumers(Class<T> annotation, Function<T, String> fn) {
-        return indexConsumers(annotation, fn, annotation);
+    public static <T extends Annotation, V> Map<String, V> indexConsumers(Class<T> annotation, Function<T, String> fn) {
+        Stream<V> objectStream = getClasses(annotation).map(
+                clazz -> Enumerator.newInstance((Class<V>) clazz)
+        ).filter(Objects::nonNull);
+        return indexConsumers(annotation, fn, objectStream);
     }
 
-    public static <T extends Annotation, C> Map<String, Class<? extends C>> indexConsumers(Class<T> annotation, Function<T, String> fn, Class<?> packageMarker) {
-        return getClasses(packageMarker).filter(
-                c -> c.getAnnotation(annotation) != null
-        ).map(
-                c -> (Class<C>) c
+    public static <A extends Annotation, V> Map<String, V> indexConsumers(Class<A> annotation, Function<A, String> fn, Stream<V> objects) {
+        Function<Class<?>, String> keyFromClass = fn.compose(clazz -> clazz.getAnnotation(annotation));
+        Function<Object, String> compose1 = keyFromClass.compose(Object::getClass);
+
+        return objects.filter(
+                c -> c.getClass().getAnnotation(annotation) != null
         ).collect(
-                Collectors.toMap(c -> fn.apply(c.getAnnotation(annotation)), Function.identity())
+                Collectors.toMap(compose1, Function.identity())
         );
     }
 
@@ -59,7 +64,7 @@ public class Enumerator {
      *
      * @param packageMarker
      */
-    static Stream<Class<?>> getClasses(Class<?> packageMarker) {
+    public static Stream<Class<?>> getClasses(Class<?> packageMarker) {
         ClassLoader classLoader = packageMarker.getClassLoader();
         String packageName = packageMarker.getPackage().getName();
         return getClasses(packageName, classLoader);
@@ -118,4 +123,12 @@ public class Enumerator {
         return new SimpleEntry<>((String) field.get(null), c);
     }
 
+    @SneakyThrows({IllegalAccessException.class})
+    private static <V> V newInstance(Class<V> clazz) {
+        try {
+            return clazz.newInstance();
+        } catch (InstantiationException e) {
+            return null;
+        }
+    }
 }

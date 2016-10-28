@@ -1,8 +1,5 @@
 package com.github.jtail.enumerator;
 
-import com.github.jtail.enumerator.handlers.BearHandler;
-import com.github.jtail.enumerator.handlers.DuckHandler;
-import com.github.jtail.enumerator.handlers.EagleHandler;
 import com.github.jtail.enumerator.handlers.Handler;
 import com.github.jtail.enumerator.types.AnimalType;
 import com.github.jtail.enumerator.types.Bird;
@@ -26,12 +23,12 @@ public class EnumeratorTest {
 
     @Test
     public void indexConsumers() throws Exception {
-        Map<String, Class<? extends Function<?, String>>> handlers =
+        Map<String, Function<Object, String>> handlers =
                 Enumerator.indexConsumers(Handler.class, Handler::value);
 
-        Assert.assertEquals(DuckHandler.class, handlers.get(Bird.DUCK));
-        Assert.assertEquals(EagleHandler.class, handlers.get(Bird.EAGLE));
-        Assert.assertEquals(BearHandler.class, handlers.get(Mammal.BEAR));
+        Assert.assertEquals("Cooking duck", handlers.get(Bird.DUCK).apply(new Bird()));
+        Assert.assertEquals("Hunting with eagle", handlers.get(Bird.EAGLE).apply(new Bird()));
+        Assert.assertEquals("Running from bear", handlers.get(Mammal.BEAR).apply(new Mammal()));
     }
 
     @Test
