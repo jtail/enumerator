@@ -26,10 +26,22 @@ import static java.util.AbstractMap.SimpleEntry;
  */
 public class Enumerator {
 
+    /**
+     * Convenience method that can be used when the annotation class being used to mark
+     * fields doubles as package marker.
+     * @see #indexBeans(Class, Class)
+     */
     public static Map<String, Class<?>> indexBeans(Class<? extends Annotation> annotation) {
         return indexBeans(annotation, annotation);
     }
 
+    /**
+     * Indexes all beans in a package that carry given annotation on their final static String fields.
+     *
+     * @param annotation annotation to look for on final static String fields
+     * @param packageMarker specifies the location where the classes in the package where this class is
+     * @return A map, where key is String field value from the annotated field and value is class name.
+     */
     public static Map<String, Class<?>> indexBeans(Class<? extends Annotation> annotation, Class<?> packageMarker) {
         return getClasses(packageMarker).flatMap(
                 c -> getFieldsFinalStaticString(c).filter(
