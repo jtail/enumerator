@@ -14,6 +14,8 @@ import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -21,14 +23,12 @@ import java.util.stream.Stream;
 
 import static java.util.AbstractMap.SimpleEntry;
 
-/**
- *
- */
 public class Enumerator {
 
     /**
      * Convenience method that can be used when the annotation class being used to mark
      * fields doubles as package marker.
+     *
      * @see #indexBeans(Class, Class)
      */
     public static Map<String, Class<?>> indexBeans(Class<? extends Annotation> annotation) {
@@ -49,43 +49,45 @@ public class Enumerator {
                 ).map(
                         field -> toEntry(c, field)
                 )
-        ).collect(
-                Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)
-        );
+        ).collect(Collectors.toMap(Entry::getKey, Entry::getValue));
     }
 
-    public static <A extends Annotation, V> Map<String, V> indexConsumers(
-            Class<A> annotation,
-            Function<A, String> fn,
-            Stream<V> objects,
-            Class<?> consumerClazz,
-            Map<String, Class<?>> beanIndex
+    /**
+     * Indexes a stream of bean consumers into a map.
+     * Note: 'consumer' mentioned here is a concept, not a specific java.util.function.Consumer interface.
+     *
+     * @param consumers consumer instances to index
+     * @param keyFunction function that calculated key from object
+     * @param index bean index map previously provided by one of the indexBeans() methods.
+     * It will be verified that keys provided by keyFunction are present in this map
+     * and the bean classes are compatible with consumer generic type parameter
+     * @param <V> consumer type. Must generic interface with exactly one type parameter.
+     */
+    public static <V> Map<String, V> indexConsumers(
+            Stream<V> consumers, Function<V, Optional<String>> keyFunction, Map<String, Class<?>> index
     ) {
-        Function<Class<?>, String> keyFromClass = fn.compose(clazz -> clazz.getAnnotation(annotation));
-        Function<Object, String> compose1 = o -> {
-            Class<?> clazz = o.getClass();
-            Type type = Stream.of(clazz.getGenericInterfaces()).findFirst().orElse(null);
-            Type parameter = ((ParameterizedType) type).getActualTypeArguments()[0];
-            String key = keyFromClass.apply(clazz);
-            Class<?> beanClazz = beanIndex.get(key);
-            if (beanClazz == null) {
-                throw new IllegalStateException("Unknown key [" + key + "]");
-            } else if (((Class<?>) parameter).isAssignableFrom(beanClazz)) {
-                return key;
-            } else {
-                throw new IllegalStateException("Class [" + beanClazz.getName() + "] is not assignable from [" + ((Class) parameter).getName() + "]");
-            }
-        };
-
-        return objects.filter(
-                consumerClazz::isInstance
+        return consumers.map(
+                o -> keyFunction.apply(o).map(
+                        key -> verifyVersusIndex(index, o, key)
+                ).orElse(null)
         ).filter(
-                c -> c.getClass().getAnnotation(annotation) != null
-        ).collect(
-                Collectors.toMap(compose1, Function.identity(), (a, b) -> {
-                    throw new IllegalStateException("Multiple consumers detected on the same key: [" + a + "] and [" + b + "]");
-                })
+                Objects::nonNull
+        ).collect(Collectors.toMap(Entry::getKey, Entry::getValue, (a, b) -> {
+            throw new IllegalStateException("Multiple consumers detected on the same key: [" + a + "] and [" + b + "]");
+        }));
+    }
+
+    private static <V> SimpleEntry<String, V> verifyVersusIndex(Map<String, Class<?>> index, V object, String key) {
+        Class<?> clazz = Optional.ofNullable(index.get(key)).orElseThrow(
+                () -> new IllegalStateException("Unknown key [" + key + "]")
         );
+        Type type = Stream.of(object.getClass().getGenericInterfaces()).findFirst().orElse(null);
+        Class<?> parameter = (Class<?>) ((ParameterizedType) type).getActualTypeArguments()[0];
+        if (parameter.isAssignableFrom(clazz)) {
+            return new SimpleEntry<>(key, object);
+        } else {
+            throw new IllegalStateException("Class [" + clazz.getName() + "] is not assignable from [" + parameter.getName() + "]");
+        }
     }
 
     /**
