@@ -2,10 +2,11 @@ package com.github.jtail.enumerator.handlers;
 
 import com.github.jtail.enumerator.types.Mammal;
 
-@Handler(Mammal.BEAR)
-public class BearHandler implements AbstractHandler<Mammal> {
+@Handler("wolf")
+public class WolfHandler implements AbstractHandler<Mammal> {
+
     @Override
     public String apply(Mammal mammal) {
-        return "Running from bear";
+        return "Wolf eats a lot";
     }
 }

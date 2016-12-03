@@ -1,6 +1,10 @@
 package com.github.jtail.enumerator;
 
-import com.github.jtail.enumerator.handlers.Handler;
+import com.github.jtail.enumerator.handlers.BearHandler;
+import com.github.jtail.enumerator.handlers.DuckHandler;
+import com.github.jtail.enumerator.handlers.EagleHandler;
+import com.github.jtail.enumerator.handlers.MutantHandler;
+import com.github.jtail.enumerator.handlers.WolfHandler;
 import com.github.jtail.enumerator.types.AnimalType;
 import com.github.jtail.enumerator.types.Bird;
 import com.github.jtail.enumerator.types.Mammal;
@@ -9,9 +13,11 @@ import org.junit.Test;
 
 import java.util.Comparator;
 import java.util.Map;
-import java.util.function.Function;
+import java.util.stream.Stream;
 
 public class EnumeratorTest {
+    private final Map<String, Class<?>> beanIndex = Enumerator.indexBeans(AnimalType.class);
+
     @Test
     public void indexBeans() throws Exception {
         Map<String, Class<?>> index = Enumerator.indexBeans(AnimalType.class);
@@ -23,12 +29,25 @@ public class EnumeratorTest {
 
     @Test
     public void indexConsumers() throws Exception {
-        Map<String, Function<Object, String>> handlers =
-                Enumerator.indexConsumers(Handler.class, Handler::value);
+        MagicBox magic = new MagicBox(beanIndex, Stream.of(new BearHandler(), new EagleHandler(), new DuckHandler()));
+        Assert.assertEquals("Cooking duck", magic.handle(Bird.DUCK, new Bird()));
+        Assert.assertEquals("Hunting with eagle", magic.handle(Bird.EAGLE, new Bird()));
+        Assert.assertEquals("Running from bear", magic.handle(Mammal.BEAR, new Mammal()));
+    }
 
-        Assert.assertEquals("Cooking duck", handlers.get(Bird.DUCK).apply(new Bird()));
-        Assert.assertEquals("Hunting with eagle", handlers.get(Bird.EAGLE).apply(new Bird()));
-        Assert.assertEquals("Running from bear", handlers.get(Mammal.BEAR).apply(new Mammal()));
+    @Test(expected = IllegalStateException.class)
+    public void missmatch() throws Exception {
+        new MagicBox(beanIndex, Stream.of(new BearHandler(), new DuckHandler(), new MutantHandler()));
+    }
+
+    @Test(expected = IllegalStateException.class)
+    public void duplicate() throws Exception {
+        new MagicBox(beanIndex, Stream.of(new BearHandler(), new BearHandler(), new MutantHandler()));
+    }
+
+    @Test(expected = IllegalStateException.class)
+    public void invalidType() throws Exception {
+        new MagicBox(beanIndex, Stream.of(new BearHandler(), new DuckHandler(), new WolfHandler()));
     }
 
     @Test

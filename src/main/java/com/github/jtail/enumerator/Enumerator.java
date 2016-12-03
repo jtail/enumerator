@@ -7,12 +7,13 @@ import java.io.IOException;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -41,21 +42,37 @@ public class Enumerator {
         );
     }
 
-    public static <T extends Annotation, V> Map<String, V> indexConsumers(Class<T> annotation, Function<T, String> fn) {
-        Stream<V> objectStream = getClasses(annotation).map(
-                clazz -> Enumerator.newInstance((Class<V>) clazz)
-        ).filter(Objects::nonNull);
-        return indexConsumers(annotation, fn, objectStream);
-    }
-
-    public static <A extends Annotation, V> Map<String, V> indexConsumers(Class<A> annotation, Function<A, String> fn, Stream<V> objects) {
+    public static <A extends Annotation, V> Map<String, V> indexConsumers(
+            Class<A> annotation,
+            Function<A, String> fn,
+            Stream<V> objects,
+            Class<?> consumerClazz,
+            Map<String, Class<?>> beanIndex
+    ) {
         Function<Class<?>, String> keyFromClass = fn.compose(clazz -> clazz.getAnnotation(annotation));
-        Function<Object, String> compose1 = keyFromClass.compose(Object::getClass);
+        Function<Object, String> compose1 = o -> {
+            Class<?> clazz = o.getClass();
+            Type type = Stream.of(clazz.getGenericInterfaces()).findFirst().orElse(null);
+            Type parameter = ((ParameterizedType) type).getActualTypeArguments()[0];
+            String key = keyFromClass.apply(clazz);
+            Class<?> beanClazz = beanIndex.get(key);
+            if (beanClazz == null) {
+                throw new IllegalStateException("Unknown key [" + key + "]");
+            } else if (((Class<?>) parameter).isAssignableFrom(beanClazz)) {
+                return key;
+            } else {
+                throw new IllegalStateException("Class [" + beanClazz.getName() + "] is not assignable from [" + ((Class) parameter).getName() + "]");
+            }
+        };
 
         return objects.filter(
+                consumerClazz::isInstance
+        ).filter(
                 c -> c.getClass().getAnnotation(annotation) != null
         ).collect(
-                Collectors.toMap(compose1, Function.identity())
+                Collectors.toMap(compose1, Function.identity(), (a, b) -> {
+                    throw new IllegalStateException("Multiple consumers detected on the same key: [" + a + "] and [" + b + "]");
+                })
         );
     }
 
@@ -123,12 +140,4 @@ public class Enumerator {
         return new SimpleEntry<>((String) field.get(null), c);
     }
 
-    @SneakyThrows({IllegalAccessException.class})
-    private static <V> V newInstance(Class<V> clazz) {
-        try {
-            return clazz.newInstance();
-        } catch (InstantiationException e) {
-            return null;
-        }
-    }
 }
